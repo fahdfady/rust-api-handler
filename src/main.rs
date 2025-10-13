@@ -1,6 +1,4 @@
 use std::path::PathBuf;
-
-// src/main.rs
 use axum::{Router, routing::get};
 
 #[tokio::main]
