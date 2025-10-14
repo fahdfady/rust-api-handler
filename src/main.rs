@@ -1,12 +1,14 @@
-use std::path::PathBuf;
 use axum::{Router, routing::get};
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() {
     println!("🚀 Starting server on http://localhost:3000");
 
-    scan_api_dir("api");
-    
+    let routes = scan_api_dir("api");
+
+    println!("Routes: {routes:#?}");
+
     // Create a simple router with one test route
     let app = Router::new().route("/", get(|| async { "Hello, World!" }));
 
@@ -19,7 +21,9 @@ async fn main() {
 }
 
 /// Scan the api directory and return all .js files
-fn scan_api_dir(dir: &str) {
+fn scan_api_dir(dir: &str) -> Vec<String> {
+    let mut routes: Vec<String> = Vec::new();
+
     let path = PathBuf::from(dir);
 
     if !path.exists() {
@@ -29,7 +33,17 @@ fn scan_api_dir(dir: &str) {
     if let Ok(entries) = path.read_dir() {
         for entry in entries.flatten() {
             let path = entry.path();
-            println!("{:?}", path);
+
+            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("js") {
+                // get stem. file name without extenstion to add to route
+                if let Some(file_name) = path.file_stem() {
+
+                    let route = format!("/api/{}", file_name.to_str().unwrap());
+                    routes.push(route);
+                }
+            }
         }
     }
+
+    routes
 }
