@@ -1,6 +1,7 @@
 use axum::{
     Router,
-    http::Method,
+    http::{Method, StatusCode},
+    response::IntoResponse,
     routing::{MethodRouter, get},
 };
 use std::path::PathBuf;
@@ -16,19 +17,19 @@ async fn main() {
 
     let routes = scan_api_dir("api");
 
-    // println!("Routes: {routes:#?}");
-
     println!("found {} route(s)", routes.len());
 
     for (route, file_path) in routes {
         println!("  - {}", route);
+        let file_path_clone = file_path.clone();
         app = app.route(
             &route,
-            get(|| async move { execute_js_file(&file_path).unwrap() }),
+            get(|| async move {
+                let file_path = file_path_clone.clone();
+                handle_api_route(file_path).await
+            }),
         );
     }
-
-    // Create a simple router with one test route
 
     // Start the server
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
@@ -37,6 +38,28 @@ async fn main() {
 
     axum::serve(listener, app).await.unwrap();
 }
+
+/// execute javascript file and handle serialization
+async fn handle_api_route(file_path: String) -> impl IntoResponse {
+    match execute_js_file(&file_path) {
+        Ok(result) => {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&result) {
+
+                let body = json.get("body").unwrap().to_string();
+
+                (StatusCode::OK, body)
+            } else {
+                // if not json, return result as it is.
+                (StatusCode::OK, result)
+            }
+        }
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{{\"error\": \"{}\"}}", error),
+        ),
+    }
+}
+
 
 /// Scan the api directory and return pairs of all route names and .js files
 fn scan_api_dir(dir: &str) -> Vec<(String, String)> {

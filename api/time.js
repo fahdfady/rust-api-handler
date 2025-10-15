@@ -9,5 +9,4 @@ const handler = () => {
             message: "Current server time"
         })
     };
-
 }

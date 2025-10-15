@@ -1,6 +1,6 @@
 function handler() {
-    return {
+    return JSON.stringify({
         status: 200,
-        body: JSON.stringify({ message: "Hello from JavaScript!" })
-    };
+        body: { message: "Hello from JavaScript!" }
+    });
 }
