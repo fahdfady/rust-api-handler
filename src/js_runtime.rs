@@ -1,11 +1,11 @@
-use std::fs::read_to_string;
+use tokio::fs::read_to_string;
 
 use deno_core::JsRuntime;
 
-pub fn execute_js_file(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn execute_js_file(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let js_code = read_to_string(path).await?;
+    
     let mut runtime = JsRuntime::new(Default::default());
-
-    let js_code = read_to_string(path)?;
 
     let code = format!(
         r#"

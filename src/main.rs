@@ -5,6 +5,7 @@ use axum::{
     routing::{MethodRouter, get},
 };
 use std::path::PathBuf;
+use std::marker::Send;
 
 use crate::js_runtime::execute_js_file;
 
@@ -24,9 +25,9 @@ async fn main() {
         let file_path_clone = file_path.clone();
         app = app.route(
             &route,
-            get(|| async move {
+            get(move || {
                 let file_path = file_path_clone.clone();
-                handle_api_route(file_path).await
+                async move {handle_api_route(file_path).await }
             }),
         );
     }
@@ -41,10 +42,9 @@ async fn main() {
 
 /// execute javascript file and handle serialization
 async fn handle_api_route(file_path: String) -> impl IntoResponse {
-    match execute_js_file(&file_path) {
+    match execute_js_file(&file_path).await {
         Ok(result) => {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&result) {
-
                 let body = json.get("body").unwrap().to_string();
 
                 (StatusCode::OK, body)
@@ -59,7 +59,6 @@ async fn handle_api_route(file_path: String) -> impl IntoResponse {
         ),
     }
 }
-
 
 /// Scan the api directory and return pairs of all route names and .js files
 fn scan_api_dir(dir: &str) -> Vec<(String, String)> {
