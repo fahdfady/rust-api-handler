@@ -1,12 +1,12 @@
 const handler = () => {
     const now = new Date();
 
-    return {
+    return JSON.stringify({
         status: 200,
-        body: JSON.stringify({
+        body: {
             timestamp: now.getTime(),
             iso: now.toISOString(),
             message: "Current server time"
-        })
-    };
+        }
+    });
 }
