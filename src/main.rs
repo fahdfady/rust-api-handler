@@ -1,11 +1,5 @@
-use axum::{
-    Router,
-    http::{Method, StatusCode},
-    response::IntoResponse,
-    routing::{MethodRouter, get},
-};
-use std::path::PathBuf;
-use std::marker::Send;
+use axum::{Router, http::StatusCode, response::IntoResponse, routing::get};
+use std::{path::PathBuf, str::FromStr};
 
 use crate::js_runtime::execute_js_file;
 
@@ -27,7 +21,7 @@ async fn main() {
             &route,
             get(move || {
                 let file_path = file_path_clone.clone();
-                async move {handle_api_route(file_path).await }
+                async move { handle_api_route(file_path).await }
             }),
         );
     }
@@ -45,9 +39,13 @@ async fn handle_api_route(file_path: String) -> impl IntoResponse {
     match execute_js_file(&file_path).await {
         Ok(result) => {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&result) {
+                let status = json.get("status").unwrap().to_string();
                 let body = json.get("body").unwrap().to_string();
 
-                (StatusCode::OK, body)
+                (
+                    StatusCode::from_str(&status).unwrap_or(StatusCode::OK),
+                    body,
+                )
             } else {
                 // if not json, return result as it is.
                 (StatusCode::OK, result)
@@ -60,7 +58,7 @@ async fn handle_api_route(file_path: String) -> impl IntoResponse {
     }
 }
 
-/// Scan the api directory and return pairs of all route names and .js files
+/// Scan the api directory and return tuple of route names and paths to .js files
 fn scan_api_dir(dir: &str) -> Vec<(String, String)> {
     let mut routes: Vec<(String, String)> = Vec::new();
 
