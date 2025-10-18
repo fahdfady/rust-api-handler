@@ -1,7 +1,14 @@
-use axum::{Router, http::StatusCode, response::IntoResponse, routing::get};
-use std::{path::PathBuf, str::FromStr};
+use axum::{
+    Router,
+    body::Body,
+    extract::Query,
+    http::{HeaderMap, Method, StatusCode},
+    response::IntoResponse,
+    routing::get,
+};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
-use crate::js_runtime::execute_js_file;
+use crate::js_runtime::{JsRequest, execute_js_file};
 
 mod js_runtime;
 
@@ -18,10 +25,12 @@ async fn main() {
         println!("  - {}", route);
         let file_path_clone = file_path.clone();
         app = app.route(
-            &route,
-            get(move || {
+            &route.clone(),
+            get(move |headers, query, body| {
                 let file_path = file_path_clone.clone();
-                async move { handle_api_route(file_path).await }
+                async move {
+                    handle_api_route(headers, Method::GET, query, body, file_path, route).await
+                }
             }),
         );
     }
@@ -34,9 +43,37 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
+// async fn handle_request(app route: &str, method: RequestMethod) {}
+
 /// execute javascript file and handle serialization
-async fn handle_api_route(file_path: String) -> impl IntoResponse {
-    match execute_js_file(&file_path).await {
+async fn handle_api_route(
+    headers: HeaderMap,
+    method: Method,
+    Query(query): Query<HashMap<String, String>>,
+    body: String,
+    file_path: String,
+    route_path: String,
+) -> impl IntoResponse {
+    let headers_map: HashMap<String, String> = headers
+        .iter()
+        .filter_map(|(key, value)| {
+            value
+                .to_str()
+                .ok()
+                .map(|v| (key.to_string(), v.to_string()))
+        })
+        .collect();
+
+    let js_request = JsRequest {
+        url: route_path,
+        headers: headers_map,
+        method: method.to_string(),
+        query,
+        body: if body.is_empty() { None } else { Some(body) },
+        params: HashMap::new(),
+    };
+
+    match execute_js_file(&file_path, js_request).await {
         Ok(result) => {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&result) {
                 let status = json.get("status").unwrap().to_string();
