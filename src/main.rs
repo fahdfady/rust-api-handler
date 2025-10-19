@@ -1,12 +1,11 @@
 use axum::{
     Router,
-    body::Body,
     extract::Query,
     http::{HeaderMap, Method, StatusCode},
     response::IntoResponse,
     routing::get,
 };
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::js_runtime::{JsRequest, execute_js_file};
 
@@ -21,15 +20,33 @@ async fn main() {
 
     println!("found {} route(s)", routes.len());
 
-    for (route, file_path) in routes {
-        println!("  - {}", route);
-        let file_path_clone = file_path.clone();
+    for (route_path, file_path) in routes {
+        println!("  - {}", route_path);
+        let fp_get = file_path.clone();
+        let fp_post = file_path.clone();
+        let fp_put = file_path.clone();
+        let fp_delete = file_path.clone();
+
+        let rp_get = route_path.clone();
+        let rp_post = route_path.clone();
+        let rp_put = route_path.clone();
+        let rp_delete = route_path.clone();
+
         app = app.route(
-            &route.clone(),
+            &route_path.clone(),
             get(move |headers, query, body| {
-                let file_path = file_path_clone.clone();
+                let file_path = fp_get.clone();
+                let route_path = rp_get.clone();
                 async move {
-                    handle_api_route(headers, Method::GET, query, body, file_path, route).await
+                    handle_api_route(headers, Method::GET, query, body, file_path, route_path).await
+                }
+            })
+            .post(move |headers, query, body| {
+                let file_path = fp_post.clone();
+                let route_path = rp_post.clone();
+                async move {
+                    handle_api_route(headers, Method::POST, query, body, file_path, route_path)
+                        .await
                 }
             }),
         );
@@ -42,8 +59,6 @@ async fn main() {
 
     axum::serve(listener, app).await.unwrap();
 }
-
-// async fn handle_request(app route: &str, method: RequestMethod) {}
 
 /// execute javascript file and handle serialization
 async fn handle_api_route(
@@ -74,7 +89,10 @@ async fn handle_api_route(
     };
 
     match execute_js_file(&file_path, js_request).await {
-        Ok(response) => (StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK), serde_json::to_string(&response.body).unwrap()),
+        Ok(response) => (
+            StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
+            serde_json::to_string(&response.body).unwrap(),
+        ),
         Err(error) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("{{\"error\": \"{}\"}}", error),

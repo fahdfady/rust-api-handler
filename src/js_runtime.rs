@@ -40,8 +40,7 @@ pub async fn execute_js_file(
 
         // Call the appropiate handler function
         const handlerFn = globalThis[method];
-        handlerFn();
-        
+
         if (typeof handlerFn !== 'function') {{
             // Method not supported
             JSON.stringify({{
@@ -58,17 +57,14 @@ pub async fn execute_js_file(
         js_code, request_json
     );
 
-    // println!("{code}");
-
     let result = runtime
         .execute_script("<anon>", code)
-        .expect("asdadasdqweqwe");
+        .expect("couldn't execute code at runtime");
 
     let mut scope = runtime.handle_scope();
     let local = deno_core::v8::Local::new(&mut scope, result);
     let result_str = local.to_rust_string_lossy(&mut scope);
-    // println!("{result_str}");
+
     let response: JsResponse = serde_json::from_str::<JsResponse>(&result_str)?;
-println!("{response:?}");
     Ok(response)
 }
