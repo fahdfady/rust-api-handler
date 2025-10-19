@@ -74,20 +74,7 @@ async fn handle_api_route(
     };
 
     match execute_js_file(&file_path, js_request).await {
-        Ok(result) => {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&result) {
-                let status = json.get("status").unwrap().to_string();
-                let body = json.get("body").unwrap().to_string();
-
-                (
-                    StatusCode::from_str(&status).unwrap_or(StatusCode::OK),
-                    body,
-                )
-            } else {
-                // if not json, return result as it is.
-                (StatusCode::OK, result)
-            }
-        }
+        Ok(response) => (StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK), serde_json::to_string(&response.body).unwrap()),
         Err(error) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("{{\"error\": \"{}\"}}", error),

@@ -4,8 +4,3 @@ function GET() {
         body: { message: "Hello from JavaScript!" }
     });
 }
-
-function POST(req) {
-    console.log(req);
-    let body = request.body;
-}
