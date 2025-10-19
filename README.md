@@ -3,6 +3,6 @@ this is a demo project. I'm testing the ability to make a nextjs-like `/api/` ro
 
 ## TODO
 - [x] simple working demo (GET Requests)
-- [ ] add other HTTP methods: GET/POST/DELETE/PATCH
+- [x] add other HTTP methods: GET/POST/DELETE/PUT
 - [ ] add caching for GET routes
 - [ ] add dynamic routing `api/user/[id]`

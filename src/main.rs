@@ -48,6 +48,21 @@ async fn main() {
                     handle_api_route(headers, Method::POST, query, body, file_path, route_path)
                         .await
                 }
+            })
+            .put(move |headers, query, body| {
+                let file_path = fp_put.clone();
+                let route_path = rp_put.clone();
+                async move {
+                    handle_api_route(headers, Method::PUT, query, body, file_path, route_path).await
+                }
+            })
+            .delete(move |headers, query, body| {
+                let file_path = fp_delete.clone();
+                let route_path = rp_delete.clone();
+                async move {
+                    handle_api_route(headers, Method::DELETE, query, body, file_path, route_path)
+                        .await
+                }
             }),
         );
     }
