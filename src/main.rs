@@ -13,7 +13,7 @@ mod js_runtime;
 
 #[tokio::main]
 async fn main() {
-    println!("🚀 Starting server on http://localhost:3000");
+    println!("(´｡• ᵕ •｡`) Starting server on http://localhost:3000");
     let mut app = Router::new().route("/", get(|| async { "Hello, World!" }));
 
     let routes = scan_api_dir("api");
@@ -22,43 +22,34 @@ async fn main() {
 
     for (route_path, file_path) in routes {
         println!("  - {}", route_path);
-        let fp_get = file_path.clone();
-        let fp_post = file_path.clone();
-        let fp_put = file_path.clone();
-        let fp_delete = file_path.clone();
-
-        let rp_get = route_path.clone();
-        let rp_post = route_path.clone();
-        let rp_put = route_path.clone();
-        let rp_delete = route_path.clone();
 
         app = app.route(
             &route_path.clone(),
-            get(move |headers, query, body| {
-                let file_path = fp_get.clone();
-                let route_path = rp_get.clone();
-                async move {
+            get({
+                let file_path = file_path.clone();
+                let route_path = route_path.clone();
+                async move |headers, query, body| {
                     handle_api_route(headers, Method::GET, query, body, file_path, route_path).await
                 }
             })
-            .post(move |headers, query, body| {
-                let file_path = fp_post.clone();
-                let route_path = rp_post.clone();
-                async move {
+            .post({
+                let file_path = file_path.clone();
+                let route_path = route_path.clone();
+                async move |headers, query, body| {
                     handle_api_route(headers, Method::POST, query, body, file_path, route_path)
                         .await
                 }
             })
-            .put(move |headers, query, body| {
-                let file_path = fp_put.clone();
-                let route_path = rp_put.clone();
-                async move {
+            .put( {
+                let file_path = file_path.clone();
+                let route_path = route_path.clone();
+                async move |headers, query, body|  {
                     handle_api_route(headers, Method::PUT, query, body, file_path, route_path).await
                 }
             })
             .delete(move |headers, query, body| {
-                let file_path = fp_delete.clone();
-                let route_path = rp_delete.clone();
+                let file_path = file_path.clone();
+                let route_path = route_path.clone();
                 async move {
                     handle_api_route(headers, Method::DELETE, query, body, file_path, route_path)
                         .await
