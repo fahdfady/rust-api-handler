@@ -7,9 +7,18 @@ use axum::{
 };
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::js_runtime::{JsRequest, execute_js_file};
+use crate::{
+    js_runtime::{JsRequest, execute_js_file},
+    rs_runtime::rust_runtime,
+};
 
 mod js_runtime;
+mod rs_runtime;
+
+enum Lang {
+    Rust,
+    Javascript,
+}
 
 #[tokio::main]
 async fn main() {
@@ -19,8 +28,8 @@ async fn main() {
     let routes = scan_api_dir("api");
 
     println!("found {} route(s)", routes.len());
-
-    for (route_path, file_path) in routes {
+    rust_runtime("api/greet.rs");
+    for (route_path, file_path, lang) in routes {
         println!("  - {}", route_path);
 
         app = app.route(
@@ -40,10 +49,10 @@ async fn main() {
                         .await
                 }
             })
-            .put( {
+            .put({
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
-                async move |headers, query, body|  {
+                async move |headers, query, body| {
                     handle_api_route(headers, Method::PUT, query, body, file_path, route_path).await
                 }
             })
@@ -106,9 +115,9 @@ async fn handle_api_route(
     }
 }
 
-/// Scan the api directory and return tuple of route names and paths to .js files
-fn scan_api_dir(dir: &str) -> Vec<(String, String)> {
-    let mut routes: Vec<(String, String)> = Vec::new();
+/// Scan the api directory and return tuple of route names & paths to files & Language
+fn scan_api_dir(dir: &str) -> Vec<(String, String, Lang)> {
+    let mut routes = Vec::new();
 
     let path = PathBuf::from(dir);
 
@@ -119,15 +128,19 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String)> {
     if let Ok(entries) = path.read_dir() {
         for entry in entries.flatten() {
             let path = entry.path();
-
-            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("js") {
-                // get stem. file name without extenstion to add to route
-                if let Some(file_name) = path.file_stem() {
+            if path.is_file() {
+                let lang = match path.extension().and_then(|s: &std::ffi::OsStr| s.to_str()) {
+                    Some("js") => Some(Lang::Javascript),
+                    Some("rs") => Some(Lang::Rust),
+                    _ => None,
+                };
+                if let Some(lang) = lang
+                    && let Some(file_name) = path.file_stem()
+                {
                     let route = format!("/api/{}", file_name.to_str().unwrap());
 
                     let file_path = path.to_string_lossy().to_string();
-
-                    routes.push((route, file_path));
+                    routes.push((route, file_path, lang));
                 }
             }
         }

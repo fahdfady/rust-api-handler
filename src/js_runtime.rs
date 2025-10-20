@@ -41,7 +41,6 @@ pub async fn execute_js_file(
         // Call the appropiate handler function
         const handlerFn = globalThis[method];
 
-        console.log(typeof handlerFn);
         if (typeof handlerFn !== 'function') {{
             // Method not supported
             JSON.stringify({{

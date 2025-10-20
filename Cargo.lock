@@ -33,6 +33,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
+name = "api_dir"
+version = "0.1.0"
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -881,6 +885,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
+name = "metacall"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e23631deba4d7211ed6a9974e529e2a4930b50d0a7f65a10a2f2a3070fe8a04"
+dependencies = [
+ "metacall-inline",
+ "metacall-sys",
+]
+
+[[package]]
+name = "metacall-inline"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eea0f2dbbd54103e20203c151feeda617b410816494d8c260852059792deb616"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
+name = "metacall-sys"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90573f16c6ecec86326c251dba0651b0cdc67aae1885970a8ea457df25302b9f"
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1162,8 +1192,11 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 name = "rust-api-handler"
 version = "0.1.0"
 dependencies = [
+ "api_dir",
  "axum",
  "deno_core",
+ "metacall",
+ "metacall-sys",
  "serde",
  "serde_json",
  "tokio",

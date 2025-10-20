@@ -1,0 +1,10 @@
+[package]
+name = "api_dir"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+
+[lib]
+path = "lib.rs"
