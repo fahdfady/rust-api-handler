@@ -1,6 +1,6 @@
 use metacall::load;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Once};
+use std::collections::HashMap;
 use tokio::fs::read_to_string;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -23,10 +23,10 @@ pub async fn execute_js_file(
     path: &str,
     request: JsRequest,
 ) -> Result<JsResponse, Box<dyn std::error::Error>> {
+    let _metacall = metacall::initialize().unwrap();
+
     let js_code = read_to_string(path).await?;
     let request_json = serde_json::to_string(&request)?;
-
-    let _metacall = metacall::initialize().unwrap();
 
     // Create a module that exports the handler function
     let code = format!(
@@ -54,7 +54,7 @@ module.exports = {{ handler }};
     );
 
     // Load and execute the JavaScript code using MetaCall
-    if let Err(e) = load::from_memory("node", &code) {
+    if let Err(e) = load::from_memory(load::Tag::NodeJS, &code, None) {
         return Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("MetaCall load error: {:?}", e),
