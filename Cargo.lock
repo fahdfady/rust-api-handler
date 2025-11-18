@@ -1215,6 +1215,7 @@ dependencies = [
  "deno_core",
  "metacall",
  "metacall-sys",
+ "once_cell",
  "serde",
  "serde_json",
  "tokio",
