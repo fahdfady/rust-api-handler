@@ -25,6 +25,8 @@ async fn main() {
     println!("(´｡• ᵕ •｡`) Starting server on http://localhost:3000");
     let mut app = Router::new().route("/", get(|| async { "Hello, World!" }));
 
+    let _metacall = metacall::initialize().unwrap();
+
     let routes = scan_api_dir("api");
 
     println!("found {} route(s)", routes.len());

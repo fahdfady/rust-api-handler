@@ -1,18 +1,7 @@
 use metacall::load;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
 use tokio::fs::read_to_string;
-
-// Wrapper to make Handle Send + Sync (we ensure thread safety with Mutex)
-struct SendHandle(load::Handle);
-unsafe impl Send for SendHandle {}
-unsafe impl Sync for SendHandle {}
-
-// Global handle that persists across requests
-static METACALL_HANDLE: Lazy<Mutex<SendHandle>> =
-    Lazy::new(|| Mutex::new(SendHandle(load::Handle::new())));
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JsRequest {
@@ -34,8 +23,6 @@ pub async fn execute_js_file(
     path: &str,
     request: JsRequest,
 ) -> Result<JsResponse, Box<dyn std::error::Error>> {
-    let _metacall = metacall::initialize().unwrap();
-
     let js_code = read_to_string(path).await?;
     let request_json = serde_json::to_string(&request)?;
 
@@ -47,46 +34,36 @@ pub async fn execute_js_file(
 
     let code = format!(
         r#"
-const request_{} = {};
-const method_{} = request_{}.method;
-
-{}
-
-function handler_{}() {{
-    const handlerFn = globalThis[method_{}];
-    if (typeof handlerFn !== 'function') {{
-        return JSON.stringify({{
-            status: 405,
-            body: {{ error: 'Method ' + method_{} + ' not allowed' }}
-        }});
-    }}
-    const result = handlerFn(request_{});
-    return JSON.stringify(result);
-}}
-
-module.exports = {{ handler_{}: handler_{} }}; "#,
-        unique_id,
-        request_json,
-        unique_id,
-        unique_id,
-        js_code,
-        unique_id,
-        unique_id,
-        unique_id,
-        unique_id,
-        unique_id,
-        unique_id
+             const request = {};
+             const method = request.method;
+             
+             {}
+             
+             function handler() {{
+                 console.log(method);
+                 const handlerFn = globalThis[method];
+                 if (typeof handlerFn !== 'function') {{
+                     return JSON.stringify({{
+                         status: 405,
+                         body: {{ error: 'Method ' + method + ' not allowed' }}
+                     }});
+                 }}
+                 const result = handlerFn(request);
+                 return JSON.stringify(result);
+             }}
+             
+             module.exports = {{ handler }}; "#,
+        request_json, js_code,
     );
 
-    // Lock the global handle (blocks if another thread is using it)
-    let mut handle = METACALL_HANDLE.lock().unwrap();
+    println!("{code}");
 
     // Load the JavaScript code
-    if let Err(e) = load::from_memory(load::Tag::NodeJS, &code, Some(&mut handle.0)) {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("MetaCall load error: {:?}", e),
-        )));
+    if let Err(e) = load::from_memory(load::Tag::NodeJS, &code, None) {
+        return Err(Box::new(std::io::Error::other(format!(
+            "MetaCall load error: {:?}",
+            e
+        ))));
     }
 
     // Call the handler function
