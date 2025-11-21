@@ -1,6 +1,3 @@
-const request_1763637646175290971 = { "url": "/api/hello", "headers": { "host": "localhost:3000", "user-agent": "curl/8.16.0", "accept": "*/*" }, "method": "GET", "body": null, "params": {}, "query": {} };
-const method_1763637646175290971 = request_1763637646175290971.method;
-
 /// RUN: curl -X GET http://localhost:3000/api/hello
 function GET() {
   return JSON.stringify({
@@ -56,16 +53,23 @@ function DELETE(req) {
   });
 }
 
-function handler_1763637646175290971() {
-  const handlerFn = globalThis[method_1763637646175290971];
+const handlers = { GET, POST, PUT, DELETE };
+
+const request = { "url": "/api/hello", "headers": { "user-agent": "curl/8.16.0", "accept": "*/*", "host": "localhost:3000" }, "method": "GET", "body": null, "params": {}, "query": {} };
+const method = request.method;
+
+function handler() {
+  console.log(method);
+  const handlerFn = handlers[method];
+  console.log(handlerFn);
   if (typeof handlerFn !== 'function') {
     return JSON.stringify({
       status: 405,
-      body: { error: 'Method ' + method_1763637646175290971 + ' not allowed' }
+      body: { error: 'Method ' + method + ' not allowed' }
     });
   }
-  const result = handlerFn(request_1763637646175290971);
+  const result = handlerFn(request);
   return JSON.stringify(result);
 }
 
-module.exports = { handler_1763637646175290971: handler_1763637646175290971 }; 
+module.exports = { handler };

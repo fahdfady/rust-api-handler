@@ -13,7 +13,7 @@ pub struct JsRequest {
     pub query: HashMap<String, String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsResponse {
     pub status: u16,
     pub body: serde_json::Value,
@@ -34,14 +34,17 @@ pub async fn execute_js_file(
 
     let code = format!(
         r#"
-             const request = {};
-             const method = request.method;
-             
              {}
              
+             const handlers = {{ GET, POST, PUT, DELETE }};
+            
+             const request = {};
+             const method = request.method;
+
              function handler() {{
                  console.log(method);
-                 const handlerFn = globalThis[method];
+                 const handlerFn = handlers[method];
+                 console.log(handlerFn);
                  if (typeof handlerFn !== 'function') {{
                      return JSON.stringify({{
                          status: 405,
@@ -49,11 +52,11 @@ pub async fn execute_js_file(
                      }});
                  }}
                  const result = handlerFn(request);
-                 return JSON.stringify(result);
+                 return result;
              }}
              
              module.exports = {{ handler }}; "#,
-        request_json, js_code,
+        js_code, request_json,
     );
 
     println!("{code}");
@@ -67,11 +70,14 @@ pub async fn execute_js_file(
     }
 
     // Call the handler function
-    let result_str =
-        metacall::metacall::<String>(&format!("handler_{}", unique_id), Vec::<i32>::new())
-            .map_err(|e| format!("Failed to call handler: {:?}", e))?;
+    let result_str = metacall::metacall::<String>(&format!("handler"), Vec::<i32>::new())
+        .map_err(|e| format!("Failed to call handler: {:?}", e))?;
 
-    let response: JsResponse = serde_json::from_str(&result_str)?;
+    println!("result: {result_str}");
+    let response: JsResponse =
+        serde_json::from_str(&result_str).expect("couldn't change result to JsResponse");
+
+    println!("response: {:?}", response.clone());
 
     Ok(response)
 }

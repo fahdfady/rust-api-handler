@@ -30,7 +30,9 @@ async fn main() {
     let routes = scan_api_dir("api");
 
     println!("found {} route(s)", routes.len());
-    rust_runtime("api/greet.rs");
+
+    // rust_runtime("api/greet.rs");
+
     for (route_path, file_path, lang) in routes {
         println!("  - {}", route_path);
 
