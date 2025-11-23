@@ -1,4 +1,4 @@
-use metacall::load;
+use metacall::load::{self, Handle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::fs::read_to_string;
@@ -25,12 +25,6 @@ pub async fn execute_js_file(
 ) -> Result<JsResponse, Box<dyn std::error::Error>> {
     let js_code = read_to_string(path).await?;
     let request_json = serde_json::to_string(&request)?;
-
-    // Generate a unique function name to avoid conflicts
-    let unique_id = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
 
     let code = format!(
         r#"
@@ -61,8 +55,10 @@ pub async fn execute_js_file(
 
     println!("{code}");
 
+    let mut handle = Handle::new();
+
     // Load the JavaScript code
-    if let Err(e) = load::from_memory(load::Tag::NodeJS, &code, None) {
+    if let Err(e) = load::from_memory(load::Tag::NodeJS, &code, Some(&mut handle)) {
         return Err(Box::new(std::io::Error::other(format!(
             "MetaCall load error: {:?}",
             e
@@ -70,14 +66,10 @@ pub async fn execute_js_file(
     }
 
     // Call the handler function
-    let result_str = metacall::metacall::<String>(&format!("handler"), Vec::<i32>::new())
+    let result_str = metacall::metacall::<String>("handler", Vec::<i32>::new())
         .map_err(|e| format!("Failed to call handler: {:?}", e))?;
-
-    println!("result: {result_str}");
     let response: JsResponse =
         serde_json::from_str(&result_str).expect("couldn't change result to JsResponse");
-
-    println!("response: {:?}", response.clone());
 
     Ok(response)
 }

@@ -15,6 +15,7 @@ use crate::{
 mod js_runtime;
 mod rs_runtime;
 
+#[derive(Clone, Copy, Debug)]
 enum Lang {
     Rust,
     Javascript,
@@ -42,30 +43,64 @@ async fn main() {
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
                 async move |headers, query, body| {
-                    handle_api_route(headers, Method::GET, query, body, file_path, route_path).await
+                    handle_api_route(
+                        headers,
+                        Method::GET,
+                        query,
+                        body,
+                        file_path,
+                        route_path,
+                        lang,
+                    )
+                    .await
                 }
             })
             .post({
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
                 async move |headers, query, body| {
-                    handle_api_route(headers, Method::POST, query, body, file_path, route_path)
-                        .await
+                    handle_api_route(
+                        headers,
+                        Method::POST,
+                        query,
+                        body,
+                        file_path,
+                        route_path,
+                        lang,
+                    )
+                    .await
                 }
             })
             .put({
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
                 async move |headers, query, body| {
-                    handle_api_route(headers, Method::PUT, query, body, file_path, route_path).await
+                    handle_api_route(
+                        headers,
+                        Method::PUT,
+                        query,
+                        body,
+                        file_path,
+                        route_path,
+                        lang,
+                    )
+                    .await
                 }
             })
             .delete(move |headers, query, body| {
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
                 async move {
-                    handle_api_route(headers, Method::DELETE, query, body, file_path, route_path)
-                        .await
+                    handle_api_route(
+                        headers,
+                        Method::DELETE,
+                        query,
+                        body,
+                        file_path,
+                        route_path,
+                        lang,
+                    )
+                    .await
                 }
             }),
         );
@@ -87,6 +122,7 @@ async fn handle_api_route(
     body: String,
     file_path: String,
     route_path: String,
+    lang: Lang,
 ) -> impl IntoResponse {
     let headers_map: HashMap<String, String> = headers
         .iter()
@@ -106,16 +142,31 @@ async fn handle_api_route(
         body: if body.is_empty() { None } else { Some(body) },
         params: HashMap::new(),
     };
-
-    match execute_js_file(&file_path, js_request).await {
-        Ok(response) => (
-            StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
-            serde_json::to_string(&response.body).unwrap(),
-        ),
-        Err(error) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("{{\"error\": \"{}\"}}", error),
-        ),
+    match lang {
+        Lang::Javascript => match execute_js_file(&file_path, js_request).await {
+            Ok(response) => (
+                StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
+                serde_json::to_string(&response.body).unwrap(),
+            ),
+            Err(error) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{{\"error\": \"{}\"}}", error),
+            ),
+        },
+        Lang::Rust => {
+            todo!()
+            // let ds = "";
+            // match rust_runtime(&file_path).await {
+            //     Ok(response) => (
+            //          // StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
+            //          // serde_json::to_string(&response.body).unwrap(),
+            //     ),
+            //     Err(error) => (
+            //         StatusCode::INTERNAL_SERVER_ERROR,
+            //         format!("{{\"error\": \"{}\"}}", error),
+            //     ),
+            // }
+        }
     }
 }
 
