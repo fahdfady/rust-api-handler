@@ -55,7 +55,7 @@ function DELETE(req) {
 
 const handlers = { GET, POST, PUT, DELETE };
 
-const request = { "url": "/api/hello", "headers": { "user-agent": "curl/8.16.0", "accept": "*/*", "host": "localhost:3000" }, "method": "GET", "body": null, "params": {}, "query": {} };
+const request = { "url": "/api/hello", "headers": { "host": "localhost:3000", "user-agent": "curl/8.16.0", "accept": "*/*" }, "method": "GET", "body": null, "params": {}, "query": {} };
 const method = request.method;
 
 function handler() {
@@ -69,7 +69,6 @@ function handler() {
     });
   }
   const result = handlerFn(request);
-  return JSON.stringify(result);
+  return result;
 }
 
-module.exports = { handler };

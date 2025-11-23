@@ -9,7 +9,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     js_runtime::{JsRequest, execute_js_file},
-    rs_runtime::rust_runtime,
+    rs_runtime::execute_rust_file,
 };
 
 mod js_runtime;
@@ -153,20 +153,16 @@ async fn handle_api_route(
                 format!("{{\"error\": \"{}\"}}", error),
             ),
         },
-        Lang::Rust => {
-            todo!()
-            // let ds = "";
-            // match rust_runtime(&file_path).await {
-            //     Ok(response) => (
-            //          // StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
-            //          // serde_json::to_string(&response.body).unwrap(),
-            //     ),
-            //     Err(error) => (
-            //         StatusCode::INTERNAL_SERVER_ERROR,
-            //         format!("{{\"error\": \"{}\"}}", error),
-            //     ),
-            // }
-        }
+        Lang::Rust => match execute_rust_file(&file_path).await {
+            Ok(response) => (
+                StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
+                serde_json::to_string(&response.body).unwrap(),
+            ),
+            Err(error) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{{\"error\": \"{}\"}}", error),
+            ),
+        },
     }
 }
 

@@ -48,15 +48,15 @@ pub async fn execute_js_file(
                  const result = handlerFn(request);
                  return result;
              }}
-             
-             module.exports = {{ handler }}; "#,
+
+             module.exports = {{ handler }}; 
+             "#,
         js_code, request_json,
     );
 
-    println!("{code}");
+    print!("{code}");
 
     let mut handle = Handle::new();
-
     // Load the JavaScript code
     if let Err(e) = load::from_memory(load::Tag::NodeJS, &code, Some(&mut handle)) {
         return Err(Box::new(std::io::Error::other(format!(
@@ -66,10 +66,10 @@ pub async fn execute_js_file(
     }
 
     // Call the handler function
-    let result_str = metacall::metacall::<String>("handler", Vec::<i32>::new())
+    let result_str = metacall::metacall_handle::<String>(&mut handle, "handler", Vec::<i32>::new())
         .map_err(|e| format!("Failed to call handler: {:?}", e))?;
+    print!("result : {result_str}");
     let response: JsResponse =
         serde_json::from_str(&result_str).expect("couldn't change result to JsResponse");
-
     Ok(response)
 }

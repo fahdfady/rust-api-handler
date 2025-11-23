@@ -1,8 +1,13 @@
 use tokio::fs::read_to_string;
 
-use metacall::load;
+use metacall::load::{self, Handle};
 
-pub async fn rust_runtime(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub struct RsResponse {
+    pub status: u16,
+    pub body: String,
+}
+
+pub async fn execute_rust_file(path: &str) -> Result<RsResponse, Box<dyn std::error::Error>> {
     let rs_code = read_to_string(path).await?;
 
     let code = format!(
@@ -12,13 +17,18 @@ pub async fn rust_runtime(path: &str) -> Result<String, Box<dyn std::error::Erro
         rs_code
     );
 
+    let mut handle = Handle::new();
+
     // Load the RustJavaScript  code
-    if let Err(e) = load::from_memory(load::Tag::Rust, &code, None) {
+    if let Err(e) = load::from_memory(load::Tag::Rust, &code, Some(&mut handle)) {
         return Err(Box::new(std::io::Error::other(format!(
             "MetaCall load error: {:?}",
             e
         ))));
     }
 
-    Ok(String::from(""))
+    Ok(RsResponse {
+        status: 200,
+        body: "".to_string(),
+    })
 }
