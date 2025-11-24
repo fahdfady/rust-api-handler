@@ -33,7 +33,7 @@ pub async fn execute_js_file(
         r#"
              {}
              
-             const handlers = {{ GET, POST, PUT, DELETE }};
+             const handlers = {{ GET,POST, PUT, DELETE }};
             
              const request = {};
              const method = request.method;
@@ -59,13 +59,14 @@ pub async fn execute_js_file(
 
     print!("{code}");
 
-    let mut handle = Handle::new();
     // Load the JavaScript code
     let tag = match lang {
         Lang::NodeJS => load::Tag::NodeJS,
         Lang::TypeScript => load::Tag::TypeScript,
         _ => load::Tag::JavaScript,
     };
+
+    let mut handle = Handle::new();
 
     if let Err(e) = load::from_memory(tag, &code, Some(&mut handle)) {
         return Err(Box::new(std::io::Error::other(format!(

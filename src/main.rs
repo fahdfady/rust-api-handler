@@ -1,3 +1,5 @@
+mod runtimes;
+
 use axum::{
     Router,
     extract::Query,
@@ -5,22 +7,19 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fmt, path::PathBuf};
 
-use crate::{
+use crate::runtimes::{
     js_runtime::{JsRequest, execute_js_file},
     rs_runtime::execute_rust_file,
 };
-
-mod js_runtime;
-mod rs_runtime;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Lang {
     Rust,
     JavaScript,
-    NodeJS,
     TypeScript,
+    NodeJS,
 }
 
 #[tokio::main]
@@ -144,6 +143,7 @@ async fn handle_api_route(
         body: if body.is_empty() { None } else { Some(body) },
         params: HashMap::new(),
     };
+
     match lang {
         Lang::NodeJS => match execute_js_file(&file_path, lang, js_request).await {
             Ok(response) => (
@@ -214,4 +214,3 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String, Lang)> {
 
     routes
 }
-
