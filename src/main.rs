@@ -16,9 +16,11 @@ mod js_runtime;
 mod rs_runtime;
 
 #[derive(Clone, Copy, Debug)]
-enum Lang {
+pub enum Lang {
     Rust,
-    Javascript,
+    JavaScript,
+    NodeJS,
+    TypeScript,
 }
 
 #[tokio::main]
@@ -143,7 +145,18 @@ async fn handle_api_route(
         params: HashMap::new(),
     };
     match lang {
-        Lang::Javascript => match execute_js_file(&file_path, js_request).await {
+        Lang::NodeJS => match execute_js_file(&file_path, lang, js_request).await {
+            Ok(response) => (
+                StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
+                serde_json::to_string(&response.body).unwrap(),
+            ),
+            Err(error) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{{\"error\": \"{}\"}}", error),
+            ),
+        },
+
+        Lang::TypeScript => match execute_js_file(&file_path, lang, js_request).await {
             Ok(response) => (
                 StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
                 serde_json::to_string(&response.body).unwrap(),
@@ -163,6 +176,7 @@ async fn handle_api_route(
                 format!("{{\"error\": \"{}\"}}", error),
             ),
         },
+        _ => todo!(),
     }
 }
 
@@ -181,8 +195,9 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String, Lang)> {
             let path = entry.path();
             if path.is_file() {
                 let lang = match path.extension().and_then(|s: &std::ffi::OsStr| s.to_str()) {
-                    Some("js") => Some(Lang::Javascript),
+                    Some("js") => Some(Lang::NodeJS),
                     Some("rs") => Some(Lang::Rust),
+                    Some("ts") => Some(Lang::TypeScript),
                     _ => None,
                 };
                 if let Some(lang) = lang
@@ -199,3 +214,4 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String, Lang)> {
 
     routes
 }
+

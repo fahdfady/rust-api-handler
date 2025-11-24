@@ -1,7 +1,9 @@
-use metacall::load::{self, Handle};
+use metacall::load::{self, Handle, Tag};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::fs::read_to_string;
+
+use crate::Lang;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JsRequest {
@@ -21,6 +23,7 @@ pub struct JsResponse {
 
 pub async fn execute_js_file(
     path: &str,
+    lang: Lang,
     request: JsRequest,
 ) -> Result<JsResponse, Box<dyn std::error::Error>> {
     let js_code = read_to_string(path).await?;
@@ -58,7 +61,13 @@ pub async fn execute_js_file(
 
     let mut handle = Handle::new();
     // Load the JavaScript code
-    if let Err(e) = load::from_memory(load::Tag::NodeJS, &code, Some(&mut handle)) {
+    let tag = match lang {
+        Lang::NodeJS => load::Tag::NodeJS,
+        Lang::TypeScript => load::Tag::TypeScript,
+        _ => load::Tag::JavaScript,
+    };
+
+    if let Err(e) = load::from_memory(tag, &code, Some(&mut handle)) {
         return Err(Box::new(std::io::Error::other(format!(
             "MetaCall load error: {:?}",
             e

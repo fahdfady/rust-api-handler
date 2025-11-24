@@ -20,7 +20,7 @@ pub async fn execute_rust_file(path: &str) -> Result<RsResponse, Box<dyn std::er
     let mut handle = Handle::new();
 
     // Load the RustJavaScript  code
-    if let Err(e) = load::from_memory(load::Tag::Rust, &code, Some(&mut handle)) {
+    if let Err(e) = load::from_memory(load::Tag::Rust, &code, None) {
         return Err(Box::new(std::io::Error::other(format!(
             "MetaCall load error: {:?}",
             e
