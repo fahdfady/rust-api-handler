@@ -301,9 +301,9 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "metacall"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32f1a36aee133b34ae24564e785552f6e17bf1b323d00fac491d3d1698a42621"
+checksum = "c791aa16565f3a0257f4f7f3d6bcb1a5d432eecfb961102bf656a3fa82f268a9"
 dependencies = [
  "metacall-inline",
  "metacall-sys",
@@ -321,9 +321,9 @@ dependencies = [
 
 [[package]]
 name = "metacall-sys"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90573f16c6ecec86326c251dba0651b0cdc67aae1885970a8ea457df25302b9f"
+checksum = "1d53850b7bb305f49179ad9b1f93c8a6826c88be1970405626b26dccd094a387"
 
 [[package]]
 name = "mime"

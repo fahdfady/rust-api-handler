@@ -1,3 +1,4 @@
+pub mod modules;
 mod runtimes;
 
 use axum::{
@@ -7,20 +8,12 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use std::{collections::HashMap, fmt, path::PathBuf};
+use metacall::load::{self, Handle};
+use std::{collections::HashMap, path::PathBuf};
+use tokio::fs::read_to_string;
 
-use crate::runtimes::{
-    js_runtime::{JsRequest, execute_js_file},
-    rs_runtime::execute_rust_file,
-};
-
-#[derive(Clone, Copy, Debug)]
-pub enum Lang {
-    Rust,
-    JavaScript,
-    TypeScript,
-    NodeJS,
-}
+use crate::modules::{ApiRequest, Lang};
+use crate::runtimes::{js_runtime::execute_js_file, rs_runtime::execute_rust_file};
 
 #[tokio::main]
 async fn main() {
@@ -135,7 +128,7 @@ async fn handle_api_route(
         })
         .collect();
 
-    let js_request = JsRequest {
+    let js_request = ApiRequest {
         url: route_path,
         headers: headers_map,
         method: method.to_string(),
@@ -213,4 +206,24 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String, Lang)> {
     }
 
     routes
+}
+
+/// Load into MetaCall on a blocking thread
+async fn load_code(path: &str, lang: Lang) -> Result<(), Box<dyn std::error::Error>> {
+    let code = read_to_string(path).await?;
+    tokio::task::spawn_blocking({
+        let code = code.clone();
+        move || {
+            // Load the JavaScript code
+            let tag = match lang {
+                Lang::NodeJS => load::Tag::NodeJS,
+                Lang::TypeScript => load::Tag::TypeScript,
+                _ => load::Tag::JavaScript,
+            };
+            let mut handle = Handle::new();
+            load::from_memory(tag, code, None).expect("Couldn't load from memoery");
+        }
+    })
+    .await?;
+    Ok(())
 }
