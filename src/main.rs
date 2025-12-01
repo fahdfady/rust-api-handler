@@ -1,5 +1,4 @@
 pub mod modules;
-mod runtimes;
 
 use axum::{
     Router,
@@ -8,57 +7,209 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use metacall::load::{self, Handle};
+use metacall::load::{self, Handle, Tag};
 use std::{
     collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-use tokio::fs::read_to_string;
+use tokio::{
+    fs::read_to_string,
+    sync::{mpsc, oneshot},
+};
 
-use crate::modules::{ApiRequest, Lang};
-use crate::runtimes::{js_runtime::execute_js_file, rs_runtime::execute_rust_file};
+use crate::modules::{ApiRequest, ApiResponse, Lang};
 
 pub struct Route {
-    path: String,
-    code: String,
+    pub path: String,
+    pub code: String,
+    pub lang: Tag,
 }
+
 pub struct Routes {
     pub routes: Vec<Route>,
-    pub handles: HashMap<String, Arc<Mutex<Handle>>>,
+    pub runtime: Arc<MetaCallRuntime>,
 }
 
 impl Routes {
-    /// Load into MetaCall on a blocking thread
-    pub async fn load_code(
+    pub fn new() -> Self {
+        Self {
+            routes: Vec::new(),
+            runtime: Arc::new(MetaCallRuntime::new()),
+        }
+    }
+
+    pub async fn load_script(
         &mut self,
-        path: &str,
-        lang: Lang,
+        file_path: &str,
+        lang: Tag,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let code = read_to_string(path).await?;
+        let code = read_to_string(file_path).await?;
+
+        // Send load command to MetaCall runtime
 
         self.routes.push(Route {
-            path: path.to_string(),
-            code: code.clone(),
+            path: file_path.to_string(),
+            code,
+            lang,
         });
 
-        tokio::task::spawn_blocking({
-            let code = code.clone();
-            move || {
-                let mut handle = Handle::new();
-                let handle_arc = Arc::new(Mutex::new(handle));
-                self.handles.insert(path.to_string(), handle_arc);
-                let tag = match lang {
-                    Lang::NodeJS => load::Tag::NodeJS,
-                    Lang::TypeScript => load::Tag::TypeScript,
-                    Lang::Ruby => load::Tag::Ruby,
-                    _ => load::Tag::JavaScript,
-                };
-                load::from_memory(tag, code, None).expect("Couldn't load from memoery");
-            }
-        })
-        .await?;
         Ok(())
+    }
+
+    pub async fn call_handler(
+        &self,
+        file_path: &str,
+        method: &str,
+        request: ApiRequest,
+    ) -> Result<ApiResponse, Box<dyn std::error::Error>> {
+        let request_json = serde_json::to_string(&request)?;
+
+        // Call function through the runtime
+        let result = self
+            .runtime
+            .call_function(
+                file_path.to_string(),
+                method.to_string(),
+                vec![request_json],
+            )
+            .await?;
+
+        let response: ApiResponse = serde_json::from_str(&result)?;
+        Ok(response)
+    }
+}
+
+pub enum MetaCallCommand {
+    LoadScript {
+        path: String,
+        code: String,
+        lang: Tag,
+        response: oneshot::Sender<Result<(), String>>,
+    },
+    CallFunction {
+        script_path: String,
+        function_name: String,
+        args: Vec<String>,
+        response: oneshot::Sender<Result<String, String>>,
+    },
+}
+
+struct MetaCallRuntime {
+    sender: mpsc::UnboundedSender<MetaCallCommand>,
+}
+
+impl MetaCallRuntime {
+    pub fn new() -> Self {
+        let (tx, mut rx) = mpsc::unbounded_channel::<MetaCallCommand>();
+
+        std::thread::spawn(move || {
+            let _metacall = metacall::initialize().expect("Failed to initialize metacall");
+            let mut handles: HashMap<String, Handle> = HashMap::new();
+
+            while let Some(cmd) = rx.blocking_recv() {
+                match cmd {
+                    MetaCallCommand::LoadScript {
+                        path,
+                        code,
+                        lang,
+                        response,
+                    } => {
+                        let result = Self::load(&mut handles, &path, &code, lang);
+
+                        response.send(result);
+                    }
+
+                    MetaCallCommand::CallFunction {
+                        script_path,
+                        function_name,
+                        args,
+                        response,
+                    } => {
+                        let result = Self::call_function_blocking(
+                            &mut handles,
+                            &script_path,
+                            &function_name,
+                            args,
+                        );
+
+                        response.send(result);
+                    }
+                }
+            }
+        });
+        Self { sender: tx }
+    }
+
+    fn load(
+        handles: &mut HashMap<String, Handle>,
+        path: &str,
+        code: &str,
+        lang: Tag,
+    ) -> Result<(), String> {
+        let mut handle = Handle::new();
+
+        load::from_memory(lang, code, Some(&mut handle))
+            .map_err(|e| format!("Couldn't load from memory {:?}", e));
+
+        handles.insert(path.to_string(), handle);
+        Ok(())
+    }
+
+    fn call_function_blocking(
+        handles: &mut HashMap<String, Handle>,
+        script_path: &str,
+        function_name: &str,
+        args: Vec<String>,
+    ) -> Result<String, String> {
+        // Get the handle for this script
+        let handle = handles
+            .get_mut(script_path)
+            .ok_or_else(|| format!("Script not loaded: {}", script_path))?;
+
+        // Call the function
+        let result = metacall::metacall_handle::<String>(handle, function_name, args)
+            .map_err(|e| format!("Failed to call {}: {:?}", function_name, e))?;
+
+        Ok(result)
+    }
+
+    pub async fn load_script(&self, path: String, code: String, lang: Tag) -> Result<(), String> {
+        let (tx, rx) = oneshot::channel();
+
+        self.sender
+            .send(MetaCallCommand::LoadScript {
+                path,
+                code,
+                lang,
+                response: tx,
+            })
+            .map_err(|_| "MetaCall runtime disconnected".to_string())?;
+
+        rx.await
+            .map_err(|_| "Response channel closed".to_string())?
+    }
+
+    // Public async API for calling functions
+    pub async fn call_function(
+        &self,
+        script_path: String,
+        function_name: String,
+        args: Vec<String>,
+    ) -> Result<String, String> {
+        let (tx, rx) = oneshot::channel();
+
+        self.sender
+            .send(MetaCallCommand::CallFunction {
+                script_path,
+                function_name,
+                args,
+                response: tx,
+            })
+            .map_err(|_| "MetaCall runtime disconnected".to_string())?;
+
+        rx.await
+            .map_err(|_| "Response channel closed".to_string())?
     }
 }
 
@@ -69,77 +220,93 @@ async fn main() {
 
     let _metacall = metacall::initialize().unwrap();
 
-    let routes = scan_api_dir("api");
+    // let routes = scan_api_dir("api");
 
-    println!("found {} route(s)", routes.len());
+    let mut routes = Routes::new();
 
-    // rust_runtime("api/greet.rs");
+    let api_files = scan_api_dir("api");
 
-    for (route_path, file_path, lang) in routes {
+    println!("found {} route(s)", api_files.len());
+
+    for (route_path, file_path, lang) in &api_files {
         println!("  - {}", route_path);
 
+        if let Err(e) = routes.load_script(&file_path, *lang).await {
+            eprintln!("Couldn't load route {}: {:?}", file_path, e);
+            continue;
+        };
+    }
+
+    let routes = Arc::new(routes);
+
+    for (route_path, file_path, lang) in api_files {
+        let routes = Arc::clone(&routes);
         app = app.route(
             &route_path.clone(),
             get({
+                let routes = Arc::clone(&routes);
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
                 async move |headers, query, body| {
                     handle_api_route(
+                        routes,
                         headers,
                         Method::GET,
                         query,
                         body,
                         file_path,
                         route_path,
-                        lang,
                     )
                     .await
                 }
             })
             .post({
+                let routes = Arc::clone(&routes);
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
                 async move |headers, query, body| {
                     handle_api_route(
+                        routes,
                         headers,
                         Method::POST,
                         query,
                         body,
                         file_path,
                         route_path,
-                        lang,
                     )
                     .await
                 }
             })
             .put({
+                let routes = Arc::clone(&routes);
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
                 async move |headers, query, body| {
                     handle_api_route(
+                        routes,
                         headers,
                         Method::PUT,
                         query,
                         body,
                         file_path,
                         route_path,
-                        lang,
                     )
                     .await
                 }
             })
             .delete(move |headers, query, body| {
+                let routes = Arc::clone(&routes);
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
                 async move {
                     handle_api_route(
+                        routes,
                         headers,
                         Method::DELETE,
                         query,
                         body,
                         file_path,
                         route_path,
-                        lang,
                     )
                     .await
                 }
@@ -155,15 +322,14 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-/// execute javascript file and handle serialization
 async fn handle_api_route(
+    routes: Arc<Routes>,
     headers: HeaderMap,
     method: Method,
     Query(query): Query<HashMap<String, String>>,
     body: String,
     file_path: String,
     route_path: String,
-    lang: Lang,
 ) -> impl IntoResponse {
     let headers_map: HashMap<String, String> = headers
         .iter()
@@ -175,7 +341,7 @@ async fn handle_api_route(
         })
         .collect();
 
-    let js_request = ApiRequest {
+    let request = ApiRequest {
         url: route_path,
         headers: headers_map,
         method: method.to_string(),
@@ -184,44 +350,23 @@ async fn handle_api_route(
         params: HashMap::new(),
     };
 
-    match lang {
-        Lang::NodeJS => match execute_js_file(&file_path, lang, js_request).await {
-            Ok(response) => (
-                StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
-                serde_json::to_string(&response.body).unwrap(),
-            ),
-            Err(error) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("{{\"error\": \"{}\"}}", error),
-            ),
-        },
-
-        Lang::TypeScript => match execute_js_file(&file_path, lang, js_request).await {
-            Ok(response) => (
-                StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
-                serde_json::to_string(&response.body).unwrap(),
-            ),
-            Err(error) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("{{\"error\": \"{}\"}}", error),
-            ),
-        },
-        Lang::Rust => match execute_rust_file(&file_path).await {
-            Ok(response) => (
-                StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
-                serde_json::to_string(&response.body).unwrap(),
-            ),
-            Err(error) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("{{\"error\": \"{}\"}}", error),
-            ),
-        },
-        _ => todo!(),
+    match routes
+        .call_handler(&file_path, &method.to_string(), request)
+        .await
+    {
+        Ok(response) => (
+            StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK),
+            serde_json::to_string(&response.body).unwrap(),
+        ),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{{\"error\": \"{}\"}}", error),
+        ),
     }
 }
 
 /// Scan the api directory and return tuple of route names & paths to files & Language
-fn scan_api_dir(dir: &str) -> Vec<(String, String, Lang)> {
+fn scan_api_dir(dir: &str) -> Vec<(String, String, Tag)> {
     let mut routes = Vec::new();
 
     let path = PathBuf::from(dir);
@@ -235,9 +380,9 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String, Lang)> {
             let path = entry.path();
             if path.is_file() {
                 let lang = match path.extension().and_then(|s: &std::ffi::OsStr| s.to_str()) {
-                    Some("js") => Some(Lang::NodeJS),
-                    Some("rs") => Some(Lang::Rust),
-                    Some("ts") => Some(Lang::TypeScript),
+                    Some("js") => Some(Tag::NodeJS),
+                    Some("rs") => Some(Tag::Rust),
+                    Some("ts") => Some(Tag::TypeScript),
                     _ => None,
                 };
                 if let Some(lang) = lang
