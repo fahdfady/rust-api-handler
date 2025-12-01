@@ -27,4 +27,5 @@ pub enum Lang {
     JavaScript,
     TypeScript,
     NodeJS,
+    Ruby,
 }

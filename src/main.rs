@@ -9,11 +9,58 @@ use axum::{
     routing::get,
 };
 use metacall::load::{self, Handle};
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 use tokio::fs::read_to_string;
 
 use crate::modules::{ApiRequest, Lang};
 use crate::runtimes::{js_runtime::execute_js_file, rs_runtime::execute_rust_file};
+
+pub struct Route {
+    path: String,
+    code: String,
+}
+pub struct Routes {
+    pub routes: Vec<Route>,
+    pub handles: HashMap<String, Arc<Mutex<Handle>>>,
+}
+
+impl Routes {
+    /// Load into MetaCall on a blocking thread
+    pub async fn load_code(
+        &mut self,
+        path: &str,
+        lang: Lang,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let code = read_to_string(path).await?;
+
+        self.routes.push(Route {
+            path: path.to_string(),
+            code: code.clone(),
+        });
+
+        tokio::task::spawn_blocking({
+            let code = code.clone();
+            move || {
+                let mut handle = Handle::new();
+                let handle_arc = Arc::new(Mutex::new(handle));
+                self.handles.insert(path.to_string(), handle_arc);
+                let tag = match lang {
+                    Lang::NodeJS => load::Tag::NodeJS,
+                    Lang::TypeScript => load::Tag::TypeScript,
+                    Lang::Ruby => load::Tag::Ruby,
+                    _ => load::Tag::JavaScript,
+                };
+                load::from_memory(tag, code, None).expect("Couldn't load from memoery");
+            }
+        })
+        .await?;
+        Ok(())
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -206,24 +253,4 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String, Lang)> {
     }
 
     routes
-}
-
-/// Load into MetaCall on a blocking thread
-async fn load_code(path: &str, lang: Lang) -> Result<(), Box<dyn std::error::Error>> {
-    let code = read_to_string(path).await?;
-    tokio::task::spawn_blocking({
-        let code = code.clone();
-        move || {
-            // Load the JavaScript code
-            let tag = match lang {
-                Lang::NodeJS => load::Tag::NodeJS,
-                Lang::TypeScript => load::Tag::TypeScript,
-                _ => load::Tag::JavaScript,
-            };
-            let mut handle = Handle::new();
-            load::from_memory(tag, code, None).expect("Couldn't load from memoery");
-        }
-    })
-    .await?;
-    Ok(())
 }
