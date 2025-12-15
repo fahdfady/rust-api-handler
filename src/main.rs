@@ -104,7 +104,7 @@ pub enum MetaCallCommand {
     },
 }
 
-struct MetaCallRuntime {
+pub struct MetaCallRuntime {
     sender: mpsc::UnboundedSender<MetaCallCommand>,
 }
 
@@ -391,8 +391,8 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String, Tag)> {
             if path.is_file() {
                 let lang = match path.extension().and_then(|s: &std::ffi::OsStr| s.to_str()) {
                     Some("js") => Some(Tag::NodeJS),
-                    Some("rs") => Some(Tag::Rust),
                     Some("ts") => Some(Tag::TypeScript),
+                    Some("py") => Some(Tag::Python),
                     _ => None,
                 };
                 if let Some(lang) = lang
