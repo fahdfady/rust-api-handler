@@ -1,5 +1,5 @@
 /// RUN: curl -X GET http://localhost:3000/api/hello
-function GET() {
+function GET(reqString) {
   return JSON.stringify({
     status: 200,
     body: { message: "Hello from JavaScript!" }
@@ -7,7 +7,8 @@ function GET() {
 }
 
 /// RUN: curl -X POST http://localhost:3000/api/hello -H "Content-Type: application/json" -d '{"name": "Fahd"}'
-function POST(req) {
+function POST(reqString) {
+  const req = JSON.parse(reqString);
   const data = JSON.parse(req.body);
   const name = data.name;
 
@@ -18,7 +19,8 @@ function POST(req) {
 }
 
 /// RUN: curl -X PUT http://localhost:3000/api/hello -H "Content-Type: application/json" -d '{"name": "Fahd", "newName": "Ashour"}'
-function PUT(req) {
+function PUT(reqString) {
+  const req = JSON.parse(reqString);
   const data = JSON.parse(req.body);
   const { name, newName } = data;
 
@@ -36,7 +38,8 @@ function PUT(req) {
 }
 
 /// RUN: curl -X DELETE http://localhost:3000/api/hello -H "Content-Type: application/json" -d '{"name": "Fahd"}'
-function DELETE(req) {
+function DELETE(reqString) {
+  const req = JSON.parse(reqString);
   const data = JSON.parse(req.body);
   const { name } = data;
 
@@ -52,3 +55,5 @@ function DELETE(req) {
     body: { message: `Deleted user ${name}` }
   });
 }
+
+module.exports = { GET, POST, PUT, DELETE };

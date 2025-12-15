@@ -18,7 +18,7 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
-use crate::modules::{ApiRequest, ApiResponse, Lang};
+use crate::modules::{ApiRequest, ApiResponse};
 
 pub struct Route {
     pub path: String,
@@ -47,6 +47,9 @@ impl Routes {
         let code = read_to_string(file_path).await?;
 
         // Send load command to MetaCall runtime
+        self.runtime
+            .load_script(file_path.to_string(), code.clone(), lang)
+            .await?;
 
         self.routes.push(Route {
             path: file_path.to_string(),
@@ -80,6 +83,12 @@ impl Routes {
     }
 }
 
+impl Default for Routes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub enum MetaCallCommand {
     LoadScript {
         path: String,
@@ -105,6 +114,7 @@ impl MetaCallRuntime {
 
         std::thread::spawn(move || {
             let _metacall = metacall::initialize().expect("Failed to initialize metacall");
+            // script path, Handle
             let mut handles: HashMap<String, Handle> = HashMap::new();
 
             while let Some(cmd) = rx.blocking_recv() {
@@ -117,7 +127,7 @@ impl MetaCallRuntime {
                     } => {
                         let result = Self::load(&mut handles, &path, &code, lang);
 
-                        response.send(result);
+                        response.send(result).unwrap();
                     }
 
                     MetaCallCommand::CallFunction {
@@ -133,7 +143,7 @@ impl MetaCallRuntime {
                             args,
                         );
 
-                        response.send(result);
+                        response.send(result).unwrap();
                     }
                 }
             }
@@ -150,7 +160,7 @@ impl MetaCallRuntime {
         let mut handle = Handle::new();
 
         load::from_memory(lang, code, Some(&mut handle))
-            .map_err(|e| format!("Couldn't load from memory {:?}", e));
+            .map_err(|e| format!("Couldn't load from memory {:?}", e))?;
 
         handles.insert(path.to_string(), handle);
         Ok(())
@@ -168,6 +178,10 @@ impl MetaCallRuntime {
             .ok_or_else(|| format!("Script not loaded: {}", script_path))?;
 
         // Call the function
+        println!(
+            "Calling function '{}' in script '{}' with args: {:?}",
+            function_name, script_path, args
+        );
         let result = metacall::metacall_handle::<String>(handle, function_name, args)
             .map_err(|e| format!("Failed to call {}: {:?}", function_name, e))?;
 
@@ -217,10 +231,6 @@ impl MetaCallRuntime {
 async fn main() {
     println!("(´｡• ᵕ •｡`) Starting server on http://localhost:3000");
     let mut app = Router::new().route("/", get(|| async { "Hello, World!" }));
-
-    let _metacall = metacall::initialize().unwrap();
-
-    // let routes = scan_api_dir("api");
 
     let mut routes = Routes::new();
 
@@ -351,7 +361,7 @@ async fn handle_api_route(
     };
 
     match routes
-        .call_handler(&file_path, &method.to_string(), request)
+        .call_handler(&file_path, method.as_ref(), request)
         .await
     {
         Ok(response) => (

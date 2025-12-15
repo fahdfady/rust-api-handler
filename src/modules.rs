@@ -17,6 +17,7 @@ pub struct ApiRequest {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ApiResponse {
     pub status: u16,
+    #[serde(default)]
     pub headers: Headers,
     pub body: serde_json::Value,
 }
