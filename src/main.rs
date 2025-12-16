@@ -393,7 +393,7 @@ fn scan_api_dir(dir: &str) -> Vec<(String, String, Tag)> {
                     Some("js") => Some(Tag::NodeJS),
                     Some("ts") => Some(Tag::TypeScript),
                     Some("py") => Some(Tag::Python),
-                    // Some("rb") => Some(Tag::Ruby),
+                    Some("rb") => Some(Tag::Ruby),
                     _ => None,
                 };
                 if let Some(lang) = lang
