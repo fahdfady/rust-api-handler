@@ -378,35 +378,68 @@ async fn handle_api_route(
 /// Scan the api directory and return tuple of route names & paths to files & Language
 fn scan_api_dir(dir: &str) -> Vec<(String, String, Tag)> {
     let mut routes = Vec::new();
+    let base_path = PathBuf::from(dir);
 
-    let path = PathBuf::from(dir);
-
-    if !path.exists() {
-        eprint!("Directory {path:?} not found")
+    if !base_path.exists() {
+        eprint!("Directory {base_path:?} not found");
+        return routes;
     }
 
-    if let Ok(entries) = path.read_dir() {
+    scan_api_dir_recursive(&base_path, &base_path, &mut routes);
+    routes
+}
+
+/// Recursively scan directories for API files
+fn scan_api_dir_recursive(
+    base_path: &PathBuf,
+    current_path: &PathBuf,
+    routes: &mut Vec<(String, String, Tag)>,
+) {
+    if let Ok(entries) = current_path.read_dir() {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
+
+            if path.is_dir() {
+                // Recursively scan subdirectories
+                scan_api_dir_recursive(base_path, &path, routes);
+            } else if path.is_file() {
+                // Check if file has a supported extension
                 let lang = match path.extension().and_then(|s: &std::ffi::OsStr| s.to_str()) {
                     Some("js") => Some(Tag::NodeJS),
                     Some("ts") => Some(Tag::TypeScript),
                     Some("py") => Some(Tag::Python),
-                    Some("rb") => Some(Tag::Ruby),
+                    // Some("rb") => Some(Tag::Ruby),
                     _ => None,
                 };
-                if let Some(lang) = lang
-                    && let Some(file_name) = path.file_stem()
-                {
-                    let route = format!("/api/{}", file_name.to_str().unwrap());
 
-                    let file_path = path.to_string_lossy().to_string();
-                    routes.push((route, file_path, lang));
+                if let Some(lang) = lang {
+                    // Build route path from directory structure
+                    // Remove base_path and file extension to get the route
+                    if let Ok(relative_path) = path.strip_prefix(base_path) {
+                        let route_parts: Vec<&str> =
+                            relative_path.iter().filter_map(|s| s.to_str()).collect();
+
+                        // Remove the file extension from the last part
+                        let mut route_path = String::from("/api");
+                        for (i, part) in route_parts.iter().enumerate() {
+                            if i == route_parts.len() - 1 {
+                                // Last part is the filename, remove extension
+                                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                                    route_path.push('/');
+                                    route_path.push_str(stem);
+                                }
+                            } else {
+                                // Directory name
+                                route_path.push('/');
+                                route_path.push_str(part);
+                            }
+                        }
+
+                        let file_path = path.to_string_lossy().to_string();
+                        routes.push((route_path, file_path, lang));
+                    }
                 }
             }
         }
     }
-
-    routes
 }
