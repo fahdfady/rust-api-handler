@@ -1,5 +1,5 @@
 /// RUN: curl -X GET http://localhost:3000/api/users
-function GET() {
+function GET(req) {
     const users = [
         { id: 1, name: "Ahmed", is_broke: true },
         { id: 2, name: "Galal", is_broke: true },
@@ -75,3 +75,5 @@ function DELETE(req) {
         body: { message: `Deleted user with id ${id}` }
     });
 };
+
+module.exports = { GET, POST, PUT, DELETE };

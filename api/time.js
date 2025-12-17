@@ -1,5 +1,5 @@
 /// RUN: curl -X GET http://localhost:3000/api/time
-function GET() {
+function GET(reqString) {
     const now = new Date();
 
     return JSON.stringify({
@@ -50,3 +50,5 @@ function DELETE() {
         body: { message: "Time data cache cleared" }
     });
 }
+
+module.exports = { GET, POST, PUT, DELETE };

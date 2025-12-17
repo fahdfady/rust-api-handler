@@ -297,9 +297,9 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "metacall"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c791aa16565f3a0257f4f7f3d6bcb1a5d432eecfb961102bf656a3fa82f268a9"
+checksum = "e4b4dca40b8e62399b8ccd47aece9e1b8712c82e1f4d271c8adf32d0b3b58975"
 dependencies = [
  "metacall-inline",
  "metacall-sys",
@@ -317,9 +317,9 @@ dependencies = [
 
 [[package]]
 name = "metacall-sys"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d53850b7bb305f49179ad9b1f93c8a6826c88be1970405626b26dccd094a387"
+checksum = "5691669137ed8dd625ba30c68a8f174f6d9aee1137445065aea50798cfda4e92"
 
 [[package]]
 name = "mime"
@@ -404,6 +404,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
+name = "polyglot-api-handler"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "metacall",
+ "metacall-sys",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -428,18 +440,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "rust-api-handler"
-version = "0.1.0"
-dependencies = [
- "axum",
- "metacall",
- "metacall-sys",
- "serde",
- "serde_json",
- "tokio",
 ]
 
 [[package]]
