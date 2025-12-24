@@ -2,17 +2,13 @@ pub mod modules;
 
 use axum::{
     Router,
-    extract::Query,
+    extract::{Path, Query},
     http::{HeaderMap, Method, StatusCode},
     response::IntoResponse,
     routing::get,
 };
 use metacall::load::{self, Handle, Tag};
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::{
     fs::read_to_string,
     sync::{mpsc, oneshot},
@@ -257,7 +253,7 @@ async fn main() {
                 let routes = Arc::clone(&routes);
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
-                async move |headers, query, body| {
+                async move |Path(params): Path<HashMap<String, String>>, headers, query, body| {
                     handle_api_route(
                         routes,
                         headers,
@@ -266,6 +262,7 @@ async fn main() {
                         body,
                         file_path,
                         route_path,
+                        params,
                     )
                     .await
                 }
@@ -274,7 +271,7 @@ async fn main() {
                 let routes = Arc::clone(&routes);
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
-                async move |headers, query, body| {
+                async move |Path(params): Path<HashMap<String, String>>, headers, query, body| {
                     handle_api_route(
                         routes,
                         headers,
@@ -283,6 +280,7 @@ async fn main() {
                         body,
                         file_path,
                         route_path,
+                        params,
                     )
                     .await
                 }
@@ -291,7 +289,7 @@ async fn main() {
                 let routes = Arc::clone(&routes);
                 let file_path = file_path.clone();
                 let route_path = route_path.clone();
-                async move |headers, query, body| {
+                async move |Path(params): Path<HashMap<String, String>>, headers, query, body| {
                     handle_api_route(
                         routes,
                         headers,
@@ -300,27 +298,31 @@ async fn main() {
                         body,
                         file_path,
                         route_path,
+                        params,
                     )
                     .await
                 }
             })
-            .delete(move |headers, query, body| {
-                let routes = Arc::clone(&routes);
-                let file_path = file_path.clone();
-                let route_path = route_path.clone();
-                async move {
-                    handle_api_route(
-                        routes,
-                        headers,
-                        Method::DELETE,
-                        query,
-                        body,
-                        file_path,
-                        route_path,
-                    )
-                    .await
-                }
-            }),
+            .delete(
+                move |Path(params): Path<HashMap<String, String>>, headers, query, body| {
+                    let routes = Arc::clone(&routes);
+                    let file_path = file_path.clone();
+                    let route_path = route_path.clone();
+                    async move {
+                        handle_api_route(
+                            routes,
+                            headers,
+                            Method::DELETE,
+                            query,
+                            body,
+                            file_path,
+                            route_path,
+                            params,
+                        )
+                        .await
+                    }
+                },
+            ),
         );
     }
 
@@ -340,6 +342,7 @@ async fn handle_api_route(
     body: String,
     file_path: String,
     route_path: String,
+    params: HashMap<String, String>,
 ) -> impl IntoResponse {
     let headers_map: HashMap<String, String> = headers
         .iter()
@@ -357,7 +360,7 @@ async fn handle_api_route(
         method: method.to_string(),
         query,
         body: if body.is_empty() { None } else { Some(body) },
-        params: HashMap::new(),
+        params,
     };
 
     match routes
@@ -372,6 +375,17 @@ async fn handle_api_route(
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("{{\"error\": \"{}\"}}", error),
         ),
+    }
+}
+
+/// Convert Next.js-style dynamic route segments [param] to axum 0.8+ style {param}
+fn convert_dynamic_segment(segment: &str) -> String {
+    if segment.starts_with('[') && segment.ends_with(']') {
+        // Extract the param name from [param] and convert to {param} for axum 0.8+
+        let param_name = &segment[1..segment.len() - 1];
+        format!("{{{}}}", param_name)
+    } else {
+        segment.to_string()
     }
 }
 
@@ -426,12 +440,13 @@ fn scan_api_dir_recursive(
                                 // Last part is the filename, remove extension
                                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                                     route_path.push('/');
-                                    route_path.push_str(stem);
+                                    // Convert [param] to :param for dynamic routes
+                                    route_path.push_str(&convert_dynamic_segment(stem));
                                 }
                             } else {
-                                // Directory name
+                                // Directory name - also handle dynamic segments
                                 route_path.push('/');
-                                route_path.push_str(part);
+                                route_path.push_str(&convert_dynamic_segment(part));
                             }
                         }
 
