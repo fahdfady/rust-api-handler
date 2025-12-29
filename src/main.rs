@@ -422,7 +422,7 @@ fn scan_api_dir_recursive(
                     Some("js") => Some(Tag::NodeJS),
                     Some("ts") => Some(Tag::TypeScript),
                     Some("py") => Some(Tag::Python),
-                    // Some("rb") => Some(Tag::Ruby),
+                    Some("rb") => Some(Tag::Ruby),
                     _ => None,
                 };
 

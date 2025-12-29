@@ -10,8 +10,8 @@ this is a demo project. I'm testing the ability to make a nextjs-like `/api/` ro
 - [ ] add polyglot language support
     - [X] NodeJS
     - [X] Python
-    - [ ] TypeScript
-    - [ ] Ruby
+    - [x] TypeScript
+    - [x] Ruby
     - [ ] Go
     - [ ] Rust
 
